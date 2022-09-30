@@ -89,3 +89,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// TIM
+uint64 
+sys_date(void)
+{
+  printf("called sys_year");
+  return 2022;
+}
