@@ -17,10 +17,18 @@ r_mhartid()
 #define MSTATUS_MPP_U (0L << 11)
 #define MSTATUS_MIE (1L << 3)    // machine-mode interrupt enable.
 
+// This function reads the configuration status registers on the riscv architecture. The general syntax of the `asm volatile` embedded assembly in GCC is:
+//
+//   asm volatile(instruction-template : outputs : inputs)
+//
+// The "=r" syntax seems to indicate that it is a read and placed into the variable we are supplying.
+//
+// https://stackoverflow.com/questions/59524849/setting-the-mstatus-register-for-risc-v
 static inline uint64
 r_mstatus()
 {
   uint64 x;
+  // Read CSR into x (I think).
   asm volatile("csrr %0, mstatus" : "=r" (x) );
   return x;
 }
@@ -28,6 +36,7 @@ r_mstatus()
 static inline void 
 w_mstatus(uint64 x)
 {
+  // Write CSR into x (I think).
   asm volatile("csrw mstatus, %0" : : "r" (x));
 }
 
