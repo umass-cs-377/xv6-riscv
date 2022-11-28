@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include <stddef.h>
 
 struct cpu cpus[NCPU];
 
@@ -55,6 +56,7 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      p->addedToMLFQ = 0;
   }
 }
 
@@ -434,6 +436,102 @@ wait(uint64 addr)
   }
 }
 
+// NOTE: first attempt at kernel level queue: FAILED B/C NO KERNEL MALLOC
+// NOTE: realized this is unnecessery since the max number of processes is bounded
+// struct Node {
+//   struct proc *p;
+//   struct Node *next;
+// };
+
+// struct LinkedList {
+//   struct Node *head;
+//   struct Node *tail;    // also keep a tail pointer for O(c) dequeue
+// };
+
+// // append a new process node to the end of a linked list
+// void enqueue(struct LinkedList *ll, struct proc *p) {
+//   struct Node *newEntry = malloc(sizeof(struct Node));    // PROBLEM: currently there is no kernel side memory allocator!
+//   newEntry->p = p;
+//   newEntry->next = NULL;
+
+//   if (ll->tail != NULL) {
+//     ll->tail->next = newEntry;
+//     ll->tail = newEntry;
+//   } else {
+//     ll->head = newEntry;
+//     ll->tail = newEntry;
+//   }
+// }
+
+// // remove and return the process node at the beginning of the linked list
+// struct proc *dequeue(struct LinkedList *ll) {
+//   if (ll->head != NULL) {
+//     struct proc *removedProcess = ll->head->p;
+//     ll->head = ll->head->next;
+//     if (ll->head == NULL) ll->tail = NULL;    // tail pointer also becomes NULL if no nodes in the linked list
+//     return removedProcess;
+//   }
+
+//   return NULL;
+// }
+
+// NOTE: SECOND QUEUE ATTEMPT - ARRAY INSTEAD OF LINKED LIST
+struct queue {    // circular queue
+  struct proc *procList[NPROC];
+  int head;
+  int tail;
+  int size;
+  struct spinlock lock;
+};
+
+struct queue initqueue() {
+  struct queue q;
+  q.head = 0;
+  q.tail = 0;
+  q.size = 0;
+  return q;
+}
+
+// atomically enqueue a new proc to a given queue
+// return 1 for success, 0 for failure
+int enqueue(struct queue *q, struct proc *p) {
+  acquire(&q->lock);
+
+  if (q->size < NPROC) {
+    (q->procList)[q->tail] = p;
+    q->tail = (q->tail + 1) % NPROC;
+    q->size++;
+
+    release(&q->lock);    // release here too to avoid deadlock
+
+    return 1;
+  }
+
+  release(&q->lock);
+
+  return 0;
+}
+
+// atomically dequeue the head elements from the given queue
+// return the proc that was at the head or NULL if no proc in the procList
+struct proc *dequeue(struct queue *q) {
+  acquire(&q->lock);
+
+  if (q->size > 0) {
+    struct proc *p = q->procList[q->head];
+    q->head = (q->head + 1) % NPROC;
+    q->size--;
+
+    release(&q->lock);
+
+    return p;
+  }
+
+  release(&q->lock);
+  
+  return NULL;
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -448,26 +546,76 @@ scheduler(void)
   struct cpu *c = mycpu();
   
   c->proc = 0;
+
+  // TODO move these outside the function so it is global to all processing cores
+  struct queue queues[4] = {  initqueue(),
+                              initqueue(),
+                              initqueue(),
+                              initqueue()   };
+  // low to high priority (i=0 is low, i=3 is high)
+
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    // add new processes to the MLFQ top priority queue (q3)
     for(p = proc; p < &proc[NPROC]; p++) {
+      // check if already added to the MLFQ and add it to the top priority queue if not
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+      
+      if (p->state == RUNNABLE && p->addedToMLFQ == 0) {    // NOTE: don't need to deal with queue overflow
+        enqueue(queues + 3, p);            // since won't be more processes than NPROC, no need to worry about overflow
+        p->addedToMLFQ = 1; // TODO must reset this once process is done?
+        printf("Enqueue to q3: %s\n", p->name);
       }
+      
       release(&p->lock);
     }
+
+    for (int qi = 0; qi < 4; qi++) {
+      struct queue *q = queues + qi;
+      for (int i = 0; i < q->size; i++) {
+        struct proc *p = dequeue(q);
+        // printf("Dequeue from q3: %s", p->name);
+        acquire(&p->lock);
+        if(p->state == RUNNABLE) {
+          printf("Run %s for time slice\n", p->name);
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          c->proc = p;
+          swtch(&c->context, &p->context);
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+        }
+        
+        enqueue(q, p);
+        
+        release(&p->lock);
+      }
+    }
+    
+
+    // ** ORIGINAL SCHEDULER ROUND ROBIN LOOP **
+    // for(p = proc; p < &proc[NPROC]; p++) {
+    //   acquire(&p->lock);
+    //   if(p->state == RUNNABLE) {
+    //     // Switch to chosen process.  It is the process's job
+    //     // to release its lock and then reacquire it
+    //     // before jumping back to us.
+    //     p->state = RUNNING;
+    //     c->proc = p;
+    //     swtch(&c->context, &p->context);
+
+    //     // Process is done running for now.
+    //     // It should have changed its p->state before coming back.
+    //     c->proc = 0;
+    //   }
+    //   release(&p->lock);
+    // }
   }
 }
 
