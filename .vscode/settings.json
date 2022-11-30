@@ -1,5 +1,17 @@
 {
   "files.associations": {
-    "syscall.h": "c"
+    "syscall.h": "c",
+    "stat.h": "c",
+    "types.h": "c",
+    "pstat.h": "c",
+    "user.h": "c",
+    "param.h": "c",
+    "defs.h": "c",
+    "spinlock.h": "c",
+    "memlayout.h": "c",
+    "proc.h": "c",
+    "queue.h": "c",
+    "stddef.h": "c",
+    "riscv.h": "c"
   }
 }

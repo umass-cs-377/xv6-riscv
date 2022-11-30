@@ -5,6 +5,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "pstat.h"
 
 uint64
 sys_exit(void)
@@ -94,4 +95,33 @@ uint64
 sys_getyear(void)
 {
   return 2020;
+}
+
+uint64
+sys_getpinfo(void) {
+  uint64 st;   // user pointer to struct pstat
+
+  argaddr(1, &st);
+
+  // TODO when to return -1 meaning error ??
+
+  printf("%d --> argaddr worked as expected?\n", st);
+
+  // struct pstat *ps = (struct pstat*) st;    // pointer to the location of where to put the struct
+  // // local struct to build and then place at the designated memory location
+
+  // int inuse[NPROC]; // whether this slot of the process table is in use (1 or 0)
+  // int pid[NPROC];   // PID of each process
+  // int priority[NPROC];  // current priority level of each process (0-3)
+  // enum procstate state[NPROC];  // current state (e.g., SLEEPING or RUNNABLE) of each process
+  // int ticks[NPROC][4];  // number of ticks each process has accumulated 
+	// 		// RUNNING/SCHEDULED at each of 4 priorities
+  // int wait_ticks[NPROC][4]; // number of ticks each process has waited before being scheduled
+
+  // struct pstat ps_local = {inuse, pid, priority, state, ticks, wait_ticks};
+
+  // // TODO fill in ps_local fields
+
+  // *ps = ps_local;
+  return 1;
 }

@@ -5,7 +5,6 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include <stddef.h>
 
 struct cpu cpus[NCPU];
 
@@ -171,6 +170,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->addedToMLFQ = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -563,10 +563,10 @@ scheduler(void)
       // check if already added to the MLFQ and add it to the top priority queue if not
       acquire(&p->lock);
       
-      if (p->state == RUNNABLE && p->addedToMLFQ == 0) {    // NOTE: don't need to deal with queue overflow
+      if ((p->state == USED || p->state == SLEEPING || p->state == RUNNABLE) && p->addedToMLFQ == 0) {    // NOTE: don't need to deal with queue overflow
+        printf("Enqueue to q3: %s\n", p->name);
         enqueue(queues + 3, p);            // since won't be more processes than NPROC, no need to worry about overflow
         p->addedToMLFQ = 1; // TODO must reset this once process is done?
-        printf("Enqueue to q3: %s\n", p->name);
       }
       
       release(&p->lock);
@@ -579,7 +579,8 @@ scheduler(void)
         // printf("Dequeue from q3: %s", p->name);
         acquire(&p->lock);
         if(p->state == RUNNABLE) {
-          printf("Run %s for time slice\n", p->name);
+          printf("Queue %d: Run (%d, %s) for time slice\n", qi, p->pid, p->name);
+
           // Switch to chosen process.  It is the process's job
           // to release its lock and then reacquire it
           // before jumping back to us.
@@ -592,7 +593,19 @@ scheduler(void)
           c->proc = 0;
         }
         
-        enqueue(q, p);
+        if (p->state == RUNNABLE || p->state == SLEEPING || p->state == USED) {
+          // TODO change queues based on how much time it ran for
+          enqueue(q, p);
+          // if (p->state == RUNNABLE) {
+          //   printf("*** put %s back in queue - RUNNABLE\n", p->name);
+          // } else if (p->state == USED) {
+          //   printf("*** put %s back in queue - USED\n", p->name);
+          // } else if (p->state == SLEEPING) {
+          //   printf("*** put %s back in queue - SLEEPING\n", p->name);
+          // }
+        } else {
+          printf("*** don't put (%d, %s) back in queue since done running ***\n", p->pid, p->name);
+        }
         
         release(&p->lock);
       }
@@ -600,22 +613,29 @@ scheduler(void)
     
 
     // ** ORIGINAL SCHEDULER ROUND ROBIN LOOP **
-    // for(p = proc; p < &proc[NPROC]; p++) {
-    //   acquire(&p->lock);
-    //   if(p->state == RUNNABLE) {
-    //     // Switch to chosen process.  It is the process's job
-    //     // to release its lock and then reacquire it
-    //     // before jumping back to us.
-    //     p->state = RUNNING;
-    //     c->proc = p;
-    //     swtch(&c->context, &p->context);
+  //   for(p = proc; p < &proc[NPROC]; p++) {
+  //     acquire(&p->lock);
+  //     if(p->state == RUNNABLE) {
+  //       // Switch to chosen process.  It is the process's job
+  //       // to release its lock and then reacquire it
+  //       // before jumping back to us.
+  //       p->state = RUNNING;
+  //       c->proc = p;
+  //       swtch(&c->context, &p->context);
 
-    //     // Process is done running for now.
-    //     // It should have changed its p->state before coming back.
-    //     c->proc = 0;
-    //   }
-    //   release(&p->lock);
-    // }
+  //       // Process is done running for now.
+  //       // It should have changed its p->state before coming back.
+  //       c->proc = 0;
+  //     }
+  //     release(&p->lock);
+  //   }
+  }
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+      // check if already added to the MLFQ and add it to the top priority queue if not
+      acquire(&p->lock);
+      p->addedToMLFQ = 0;
+      release(&p->lock);
   }
 }
 
