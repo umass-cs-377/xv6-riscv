@@ -12,6 +12,11 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+struct proc p3[100];
+struct proc p2[100];
+struct proc p1[100];
+struct proc p0[100];
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -444,6 +449,8 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
+
+
   struct proc *p;
   struct cpu *c = mycpu();
   
@@ -451,23 +458,83 @@ scheduler(void)
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
+    acquire(&p->lock);
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+    // for(p = proc; p < &proc[NPROC]; p++) {
+    //   if(p->state == RUNNABLE) {
+    //     // Switch to chosen process.  It is the process's job
+    //     // to release its lock and then reacquire it
+    //     // before jumping back to us.
+    //     p->state = RUNNING;
+    //     c->proc = p;
+    //     swtch(&c->context, &p->context);
+
+    //     // Process is done running for now.
+    //     // It should have changed its p->state before coming back.
+    //     c->proc = 0;
+    //   }
+    // }
+   
+    for(int i=0;i<100;i++){
+      if(p->state==RUNNABLE){
+        p = &p3[i];
         p->state = RUNNING;
+        p->ticks+=1;
         c->proc = p;
-        swtch(&c->context, &p->context);
+        swtch(&c->context,&p->context);
+        if(p->ticks==8){
+          p->priority = p->priority + 1;
+          p2[i] = *p;
+          p3[i] = &proc(); 
+          c->proc = 0;
+        }
+      }
+    }
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
+    for(int i=0;i<100;i++){
+      if(p->state==RUNNABLE){
+        p = &p2[i];
+        p->state = RUNNING;
+        p->ticks+=1;
+        c->proc = p;
+        swtch(&c->context,&p->context);
+        if(p->ticks==16){
+          p->priority = p->priority + 1;
+          p1[i] = *p;
+          p2[i] = NULL; 
+          c->proc = 0;
+        }
+      }
+    }
+
+    for(int i=0;i<100;i++){
+      if(p->state==RUNNABLE){
+        p = &p1[i];
+        p->state = RUNNING;
+        p->ticks+=1;
+        c->proc = p;
+        swtch(&c->context,&p->context);
+        if(p->ticks==32){
+          p->priority = p->priority + 1;
+          p0[i] = *p;
+          p1[i] = NULL;
+          c->proc = 0;
+        }
+      }
+    }
+
+    for(int i=0;i<100;i++){
+      if(p->state==RUNNABLE){
+        p = &p0[i];
+        p->state = RUNNING;
+        p->ticks+=1;
+        c->proc = p;
+        swtch(&c->context,&p->context);
+        p0[i] = NULL;
         c->proc = 0;
       }
-      release(&p->lock);
     }
+    release(&p->lock);
   }
 }
 
