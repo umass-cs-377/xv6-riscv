@@ -13,7 +13,7 @@ int main(int argc, char const *argv[]) {
   if (pid < 0) {
     printf("failed 1\n");
   } else if (pid == 0) {
-    for (int j = 0; j < 1000; j++) printf("");
+    for (int j = 0; j < 500; j++) printf("_");
     printf("\nChild 1 Done\n");
     exit(0);
   }
@@ -22,7 +22,7 @@ int main(int argc, char const *argv[]) {
   if (pid2 < 0) {
     printf("failed 2\n");
   } else if (pid2 == 0) {
-    for (int j = 0; j < 1000; j++) printf("");
+    for (int j = 0; j < 500; j++) printf("*");
     printf("\nChild 2 Done\n");
     exit(0);
   }

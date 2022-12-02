@@ -104,5 +104,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
   int addedToMLFQ;             // Tracks if the proc is already in a scheduler queue
+  uint startTimesliceTicks;    // Keeps track of how many ticks have elapsed during the
+                               // current timeslice
 };

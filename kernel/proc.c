@@ -56,6 +56,7 @@ procinit(void)
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
       p->addedToMLFQ = 0;
+      p->startTimesliceTicks = 0;
   }
 }
 
@@ -171,6 +172,7 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
   p->addedToMLFQ = 0;
+  p->startTimesliceTicks = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -532,6 +534,11 @@ struct proc *dequeue(struct queue *q) {
   return NULL;
 }
 
+#define ticksQ0 64
+#define ticksQ1 32
+#define ticksQ2 16
+#define ticksQ3 8
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -566,7 +573,8 @@ scheduler(void)
       if ((p->state == USED || p->state == SLEEPING || p->state == RUNNABLE) && p->addedToMLFQ == 0) {    // NOTE: don't need to deal with queue overflow
         printf("Enqueue to q3: %s\n", p->name);
         enqueue(queues + 3, p);            // since won't be more processes than NPROC, no need to worry about overflow
-        p->addedToMLFQ = 1; // TODO must reset this once process is done?
+        p->addedToMLFQ = 1;
+        p->startTimesliceTicks = ticks;
       }
       
       release(&p->lock);
@@ -579,7 +587,7 @@ scheduler(void)
         // printf("Dequeue from q3: %s", p->name);
         acquire(&p->lock);
         if(p->state == RUNNABLE) {
-          printf("Queue %d: Run (%d, %s) for time slice\n", qi, p->pid, p->name);
+          printf("{ [CONTEXT_SWITCH] Queue %d: Run proc(id=%d, name=%s) for time slice }\n", qi, p->pid, p->name);
 
           // Switch to chosen process.  It is the process's job
           // to release its lock and then reacquire it
@@ -594,8 +602,12 @@ scheduler(void)
         }
         
         if (p->state == RUNNABLE || p->state == SLEEPING || p->state == USED) {
-          // TODO change queues based on how much time it ran for
-          enqueue(q, p);
+          if (p->startTimesliceTicks - ticks >= 10) {
+            enqueue(q, p);    // keep or lower the priority?
+          } else {
+            enqueue(q, p);    // keep or higher priority?
+          }
+          
           // if (p->state == RUNNABLE) {
           //   printf("*** put %s back in queue - RUNNABLE\n", p->name);
           // } else if (p->state == USED) {
@@ -631,12 +643,12 @@ scheduler(void)
   //   }
   }
 
-  for(p = proc; p < &proc[NPROC]; p++) {
-      // check if already added to the MLFQ and add it to the top priority queue if not
-      acquire(&p->lock);
-      p->addedToMLFQ = 0;
-      release(&p->lock);
-  }
+  // for(p = proc; p < &proc[NPROC]; p++) {
+  //     // check if already added to the MLFQ and add it to the top priority queue if not
+  //     acquire(&p->lock);
+  //     p->addedToMLFQ = 0;
+  //     release(&p->lock);
+  // }
 }
 
 // Switch to scheduler.  Must hold only p->lock
