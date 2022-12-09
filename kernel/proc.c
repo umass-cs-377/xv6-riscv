@@ -12,6 +12,11 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+struct proc priority3[2]; //highest 
+struct proc priority2[2];
+struct proc priority1[2];
+struct proc priority0[2]; //lowest priority
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -441,33 +446,110 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
-void
-scheduler(void)
-{
-  struct proc *p;
+
+// void
+// scheduler(void)
+// {
+//   struct proc *p;
+//   struct cpu *c = mycpu();
+  
+//   c->proc = 0;
+//   for(;;){
+//     // Avoid deadlock by ensuring that devices can interrupt.
+//     intr_on();
+
+//     for(p = proc; p < &proc[NPROC]; p++) {
+//       acquire(&p->lock);
+//       if(p->state == RUNNABLE) {
+//         // Switch to chosen process.  It is the process's job
+//         // to release its lock and then reacquire it
+//         // before jumping back to us.
+//         p->state = RUNNING;
+//         c->proc = p;
+//         swtch(&c->context, &p->context);
+
+//         // Process is done running for now.
+//         // It should have changed its p->state before coming back.
+//         c->proc = 0;
+//       }
+//       release(&p->lock);
+//     }
+//   }
+// }
+
+void scheduler(void){ //mine
+  struct proc * p = proc;
   struct cpu *c = mycpu();
   
   c->proc = 0;
   for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+    acquire(&p->lock); 
+    //priority level 3 loop - should work as MLFQ
+    for(int i = 0; i < 2; ++i){
+      p = &priority3[i];
+      if(p->state == RUNNABLE){
         p->state = RUNNING;
+        p->ticks += 1;
         c->proc = p;
         swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
+        if(p->ticks==8){
+          p->priority = p->priority + 1;
+          priority3[i] = *p;
+          struct proc *temp = myproc(); 
+          priority2[i] = *temp;
+          c->proc = 0;
+        }
+      }
+    }
+    //priority level 2 loop - should work as MLFQ
+    for(int i = 0; i < 2; ++i){
+      p = &priority2[i];
+      if(p->state == RUNNABLE){
+        p->state = RUNNING;
+        p->ticks += 1;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        if(p->ticks==16){
+          p->priority = p->priority + 1;
+          priority2[i] = *p;
+          struct proc *temp = myproc(); 
+          priority1[i] = *temp;
+          c->proc = 0;
+        }
+      }
+    }
+    //priority level 1 loop - should work as MLFQ
+    for(int i = 0; i < 2; ++i){
+      p = &priority1[i];
+      if(p->state == RUNNABLE){
+        p->state = RUNNING;
+        p->ticks += 1;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        if(p->ticks==32){
+          p->priority = p->priority + 1;
+          priority0[i] = *p;
+          struct proc *temp = myproc(); 
+          priority1[i] = *temp;
+          c->proc = 0;
+        }
+      }
+    }
+    //priority level 0 loop - should work as FIFO
+    for(int i = 0; i < 2; i++){
+      p = &priority0[i];
+      if(p->state==RUNNABLE){
+        p = &priority0[i];
+        p->state = RUNNING;
+        p->ticks+=1;
+        c->proc = p;
+        swtch(&c->context,&p->context);
+        priority0[i] = *(struct proc *)NULL;
         c->proc = 0;
       }
-      release(&p->lock);
     }
+    release(&p->lock);
   }
 }
 

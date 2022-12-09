@@ -89,3 +89,32 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+//VIVIENNE system call to test implementing MLFQ
+
+struct pstat {
+  int inuse[NPROC]; // whether this slot of the process table is in use (1 or 0)
+  int pid[NPROC];   // PID of each process
+  int priority[NPROC];  // current priority level of each process (0-3)
+  enum procstate state[NPROC];  // current state (e.g., SLEEPING or RUNNABLE) of each process
+  int ticks[NPROC][4];  // number of ticks each process has accumulated 
+			// RUNNING/SCHEDULED at each of 4 priorities
+  int wait_ticks[NPROC][4]; // number of ticks each process has waited before being scheduled
+};
+
+uint64
+sys_getpinfo(struct pstat * process){
+  uint64 ptr;
+  argaddr(1, &ptr);
+  printf("%d is in ptr\n", ptr);
+
+  if(process->inuse[NPROC] == 0){ //what is success?
+    process->pid[NPROC] = NPROC;
+    process->priority[NPROC] = 3; //all processes start at the top level priority queue
+    process->state[NPROC] = RUNNABLE;
+    process->ticks[NPROC][4] = 0; //why is this a 2D array, isnt state enough to find current state?
+    process->wait_ticks[NPROC][4] = 0; 
+    return 0;
+  }
+  return -1;
+}
