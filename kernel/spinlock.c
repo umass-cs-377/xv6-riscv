@@ -85,8 +85,8 @@ holding(struct spinlock *lk)
 // Returns 1 if attempt is successful, 0 otherwise
 int try(struct spinlock *lk) {
   push_off(); // disable interrupts to avoid deadlock.
-  if(holding(lk))
-    panic("acquire");
+  // If we already have the lock, do nothing
+  if (holding(lk)) return 1;
 
   // On RISC-V, sync_lock_test_and_set turns into an atomic swap:
   //   a5 = 1

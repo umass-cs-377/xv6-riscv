@@ -447,27 +447,15 @@ scheduler(void)
   struct proc *current_proc = 0;
   struct proc *next_proc = 0;
   struct cpu *c = mycpu();
+
+  printf("Entering scheduler function.\n");
   
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    // for(p = proc; p < &proc[NPROC]; p++) {
-    //   acquire(&p->lock);
-    //   if(p->state == RUNNABLE) {
-    //     // Switch to chosen process.  It is the process's job
-    //     // to release its lock and then reacquire it
-    //     // before jumping back to us.
-    //     p->state = RUNNING;
-    //     c->proc = p;
-    //     swtch(&c->context, &p->context);
 
-    //     // Process is done running for now.
-    //     // It should have changed its p->state before coming back.
-    //     c->proc = 0;
-    //   }
-    //   release(&p->lock);
-    // }
+    //printf("Beginning to schedule.\n");
 
     // If the cpu was running a proc, increase the number of ticks it's been running
     if (c->proc) {
@@ -487,6 +475,7 @@ scheduler(void)
         // Clear out any previously accrued ticks
         current_proc->ticks[current_proc->priority] = 0;
         current_proc->wait_ticks[current_proc->priority] = 0;
+        printf("Demoting proc: %d\n",current_proc->pid);
       }
     }
 
@@ -503,6 +492,8 @@ scheduler(void)
           next_proc = p;
           continue;
         }
+
+        printf("Considering proc : %d\n", p->pid);
 
         // This proc has waited another round at its current priority
         if (current_proc && p != current_proc) p->wait_ticks[p->priority]++;
@@ -553,6 +544,8 @@ scheduler(void)
       if (next_proc->priority == 0 && current_proc) {
         next_proc = current_proc;
       }
+
+      printf("Switching to pid : %d\n", next_proc->pid);
 
       // We should have the lock for the proc, finally switch into it
       // Switch to chosen process.  It is the process's job
