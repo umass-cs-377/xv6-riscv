@@ -123,7 +123,8 @@ w_sepc(uint64 x)
 }
 
 static inline uint64
-r_sepc() {
+r_sepc()
+{
   uint64 x;
   asm volatile("csrr %0, sepc" : "=r" (x) );
   return x;
@@ -360,5 +361,3 @@ typedef uint64 *pagetable_t; // 512 PTEs
 // Sv39, to avoid having to sign-extend virtual addresses
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
-// What the F?
-// This is referring to the page table stuff.
