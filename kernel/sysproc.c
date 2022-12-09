@@ -89,3 +89,10 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_getpinfo(void)
+{
+  printf("test getpinfo sys call");
+  return 1;
+}

@@ -9,6 +9,16 @@
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
+struct pstat pinfo;
+// struct pstat {
+//   int inuse[NPROC]; // whether this slot of the process table is in use (1 or 0)
+//   int pid[NPROC];   // PID of each process
+//   int priority[NPROC];  // current priority level of each process (0-3)
+//   enum procstate state[NPROC];  // current state (e.g., SLEEPING or RUNNABLE) of each process
+//   int ticks[NPROC][4];  // number of ticks each process has accumulated 
+// 			// RUNNING/SCHEDULED at each of 4 priorities
+//   int wait_ticks[NPROC][4]; // number of ticks each process has waited before being scheduled
+// };
 
 struct proc *initproc;
 
@@ -55,6 +65,13 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+  }
+  //init pstat
+  for (i = 0; i < NPROC; i++) {
+    pstat->inuse[i] = 0;
+    pstat->priority[i] = 3;
+    pstat->state[i] = UNUSED;
+    //pstat->ticks[i][]
   }
 }
 
@@ -441,6 +458,11 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+struct proc L0[10]; //FIFO
+struct proc L1[10];
+struct proc L2[10];
+struct proc L3[10]; //highest priority
+//int def_times[4] = {-1, 32, 16, 8};
 void
 scheduler(void)
 {
@@ -452,7 +474,24 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    for(p = proc; p < &proc[NPROC]; p++) {
+    // for(p = proc; p < &proc[NPROC]; p++) {
+    //   acquire(&p->lock);
+    //   if(p->state == RUNNABLE) {
+    //     // Switch to chosen process.  It is the process's job
+    //     // to release its lock and then reacquire it
+    //     // before jumping back to us.
+    //     p->state = RUNNING;
+    //     c->proc = p;
+    //     swtch(&c->context, &p->context);
+
+    //     // Process is done running for now.
+    //     // It should have changed its p->state before coming back.
+    //     c->proc = 0;
+    //   }
+    //   release(&p->lock);
+    // }
+
+    for(i = 0; i < 10; i++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
