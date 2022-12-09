@@ -444,29 +444,127 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *current_proc = 0;
+  struct proc *next_proc = 0;
   struct cpu *c = mycpu();
   
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
+    // for(p = proc; p < &proc[NPROC]; p++) {
+    //   acquire(&p->lock);
+    //   if(p->state == RUNNABLE) {
+    //     // Switch to chosen process.  It is the process's job
+    //     // to release its lock and then reacquire it
+    //     // before jumping back to us.
+    //     p->state = RUNNING;
+    //     c->proc = p;
+    //     swtch(&c->context, &p->context);
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+    //     // Process is done running for now.
+    //     // It should have changed its p->state before coming back.
+    //     c->proc = 0;
+    //   }
+    //   release(&p->lock);
+    // }
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+    // If the cpu was running a proc, increase the number of ticks it's been running
+    if (c->proc) {
+      current_proc = c->proc;
+      current_proc->ticks[current_proc->priority]++;
+      uint priority = current_proc->priority;
+      uint ticks = current_proc->ticks[priority];
+
+      // Demote proc if it uses up all of its ticks at this level
+      // Never demote procs at level 0
+      if (
+        (priority == 3 && ticks == MLFQ_3_TICKS) 
+        || (priority == 2 && ticks == MLFQ_2_TICKS)
+        || (priority == 1 && ticks == MLFQ_1_TICKS)
+      ) {
+        current_proc->priority--;
+        // Clear out any previously accrued ticks
+        current_proc->ticks[current_proc->priority] = 0;
+        current_proc->wait_ticks[current_proc->priority] = 0;
       }
-      release(&p->lock);
+    }
+
+    // Loop over all procs to find the one with the least
+    // number of running ticks at the highest priority
+    for (struct proc *p = proc; p < &proc[NPROC]; p++) {
+      // Only look at procs that aren't already running.
+      // If another cpu already holds this lock, skip it
+      // otherwise we acquire the lock and can read/write to
+      // the struct
+      if(try(&p->lock) && p->state == RUNNABLE) {
+        // Make sure we set next_proc to some proc
+        if (next_proc == 0) {
+          next_proc = p;
+          continue;
+        }
+
+        // This proc has waited another round at its current priority
+        if (current_proc && p != current_proc) p->wait_ticks[p->priority]++;
+
+        uint next_priority = next_proc->priority;
+        uint next_ticks = next_proc->ticks[next_priority];
+        uint p_priority = p->priority;
+        uint p_ticks = p->ticks[p_priority];
+        uint p_wait_ticks = p->wait_ticks[p_priority];
+
+        // next_proc is set, so we need to compare to it
+        // A proc should be run instead of another proc
+        // IF:
+        //  It has a higher priority
+        //  Or equal priority but has been waiting longer
+        //    (ensures round robin-esque behavior)
+        if (
+          (p_priority > next_priority) 
+          || (p_priority == next_priority && p_ticks > next_ticks)
+        ) {
+          // Release the previously selected next_proc's lock
+          release(&next_proc->lock);
+          // We already have p's lock, so just set it as the next proc to be run
+          next_proc = p;
+        }
+
+        // Boost the proc if it has waited logn enough
+        if (
+          (p_priority == 2 && p_wait_ticks == MLFQ_2_TICKS * 10)
+          || (p_priority == 1 && p_wait_ticks == MLFQ_1_TICKS * 10)
+          || (p_priority == 0 && p_wait_ticks == 500)
+        ) {
+          p->priority++;
+          // Clear out previously accrued ticks
+          p->ticks[p->priority] = 0;
+          p->wait_ticks[p->priority] = 0;
+        }
+
+        // Release the p lock we acquired earlier, unless we think we're about to run it
+        if (p != next_proc) release(&p->lock);
+      }
+    }
+
+    if (next_proc) {
+      // We have now identified the proc that should run next
+      // But if we're at priority 0 we shouldn't switch off the current proc
+      // (if it exists)
+      if (next_proc->priority == 0 && current_proc) {
+        next_proc = current_proc;
+      }
+
+      // We should have the lock for the proc, finally switch into it
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      next_proc->state = RUNNING;
+      c->proc = next_proc;
+      swtch(&c->context, &next_proc->context);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      release(&next_proc->lock);
     }
   }
 }
