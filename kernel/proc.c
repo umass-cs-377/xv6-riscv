@@ -453,13 +453,12 @@ scheduler(void)
 
   struct proc *p;
   struct cpu *c = mycpu();
-  
+
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     acquire(&p->lock);
-
     // for(p = proc; p < &proc[NPROC]; p++) {
     //   if(p->state == RUNNABLE) {
     //     // Switch to chosen process.  It is the process's job
@@ -485,7 +484,7 @@ scheduler(void)
         if(p->ticks==8){
           p->priority = p->priority + 1;
           p2[i] = *p;
-          p3[i] = &proc(); 
+          p3[i] = NULL; 
           c->proc = 0;
         }
       }
