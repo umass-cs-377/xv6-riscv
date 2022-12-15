@@ -108,11 +108,11 @@ sys_getpinfo(struct pstat * process){
   argaddr(1, &ptr);
   printf("%d is in ptr\n", ptr);
 
-  if(process->inuse[NPROC] == 0){ //what is success?
+  if(process->inuse[NPROC] == 0){ 
     process->pid[NPROC] = NPROC;
     process->priority[NPROC] = 3; //all processes start at the top level priority queue
     process->state[NPROC] = RUNNABLE;
-    process->ticks[NPROC][4] = 0; 
+    process->ticks[NPROC][4] = 0;
     process->wait_ticks[NPROC][4] = 0; 
     return 0;
   }
