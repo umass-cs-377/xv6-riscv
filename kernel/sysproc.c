@@ -112,7 +112,7 @@ sys_getpinfo(struct pstat * process){
     process->pid[NPROC] = NPROC;
     process->priority[NPROC] = 3; //all processes start at the top level priority queue
     process->state[NPROC] = RUNNABLE;
-    process->ticks[NPROC][4] = 0; //why is this a 2D array, isnt state enough to find current state?
+    process->ticks[NPROC][4] = 0; 
     process->wait_ticks[NPROC][4] = 0; 
     return 0;
   }
