@@ -434,6 +434,13 @@ wait(uint64 addr)
   }
 }
 
+
+
+// HERE FOR MLFQ IMPLEMENTATION!!
+// unfortunately never could figure this out in time :( maybe someday
+
+
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
