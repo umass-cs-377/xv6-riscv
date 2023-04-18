@@ -5,7 +5,6 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
-#include "defs.h"
 
 uint64
 sys_exit(void)
@@ -90,12 +89,3 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
-
-
-// WILSON 
-int
-sys_getpinfo(void)
-{
-  return 0;
-}
-

@@ -124,10 +124,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-  //Added by WILSON
-  p->priority = 3;
-  //
-
+  
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -448,39 +445,27 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct proc *p2;
   struct cpu *c = mycpu();
+  
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    struct proc *high_priority = p;
-    // Loop over processes to run
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) 
-        continue;
-      high_priority = p;
-      // Select high priority
-      for(p2 = proc; p2 < &proc[NPROC]; p2++) {
-        if(p2->state == RUNNABLE) 
-          continue;
-        if(high_priority->priority > p2->priority) 
-          high_priority = p2;
-      }
-      p = high_priority;
-      // Switch to chosen process.  It is the process's job
-      // to release its lock and then reacquire it
-      // before jumping back to us.
+      if(p->state == RUNNABLE) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
 
-      p->state = RUNNING;
-      c->proc = p;
-      swtch(&c->context, &p->context);
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-      //}
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
       release(&p->lock);
     }
   }

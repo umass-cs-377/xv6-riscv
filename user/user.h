@@ -22,8 +22,6 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-// WILSON
-int getpinfo(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
