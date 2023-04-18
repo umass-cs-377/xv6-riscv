@@ -10,12 +10,16 @@ SECTIONS
   . = 0x80000000;
 
   .text : {
-    *(.text .text.*)
-    . = ALIGN(0x1000);
-    _trampoline = .;
-    *(trampsec)
-    . = ALIGN(0x1000);
+    *(.text .text.*).  /* map text segments to text */
+    . = ALIGN(0x1000); /* align on a 4K boundary */
+    _trampoline = .;   /* the trampoline part occurs after the text */
+    *(trampsec).       /* HUH: not sure what this is */
+    . = ALIGN(0x1000); /* again, align on 4K boundary */
     ASSERT(. - _trampoline == 0x1000, "error: trampoline larger than one page");
+
+    /* 
+     * I believe this "provides" a symbol to the location right after the
+     * text segment in the kernel.
     PROVIDE(etext = .);
   }
 
