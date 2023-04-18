@@ -16,15 +16,23 @@ uint64 timer_scratch[NCPU][5];
 // assembly code in kernelvec.S for machine-mode timer interrupt.
 extern void timervec();
 
+void setSupervisorMode() {
+  unsigned long x = r_mstatus();
+  x &= ~MSTATUS_MPP_MASK;
+  x |= MSTATUS_MPP_S;
+  w_mstatus(x);  
+}
+
 // entry.S jumps here in machine mode on stack0.
 void
 start()
 {
   // set M Previous Privilege mode to Supervisor, for mret.
-  unsigned long x = r_mstatus();
-  x &= ~MSTATUS_MPP_MASK;
-  x |= MSTATUS_MPP_S;
-  w_mstatus(x);
+  /* unsigned long x = r_mstatus(); */
+  /* x &= ~MSTATUS_MPP_MASK; */
+  /* x |= MSTATUS_MPP_S; */
+  /* w_mstatus(x); */
+  setSupervisorMode();
 
   // set M Exception Program Counter to main, for mret.
   // requires gcc -mcmodel=medany
@@ -34,8 +42,16 @@ start()
   w_satp(0);
 
   // delegate all interrupts and exceptions to supervisor mode.
-  w_medeleg(0xffff);
-  w_mideleg(0xffff);
+  w_medeleg(0xffff); // medeleg: machine exception delegation register
+  w_mideleg(0xffff); // midileg: machine interrupt delegation register
+
+  // This is setting the supervisor interrupt enable bits. It reads
+  // the `sie` bit from the CSR and sets the bits for external, timer,
+  // and software interrupts.
+  // TODO: I need to understand this a little better. Why are we
+  // settings this here? Is this ensuring that when interrupts are
+  // enabled, these interrupts will be passed along to supervisor
+  // mode?
   w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
   // configure Physical Memory Protection to give supervisor mode
